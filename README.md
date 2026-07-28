@@ -241,9 +241,141 @@ cloudflared tunnel --url http://localhost:8080
 
 ```
 小田的祝福/
-├── index.html          ← 成品（741KB，自包含，部署即用）
+├── index.html          ← 成品（744KB，自包含，部署即用）
 ├── README.md           ← 本文档
+├── .gitignore          ← Git 忽略规则
+├── .nojekyll           ← GitHub Pages 静态文件标记
+├── LICENSE             ← MIT 开源许可证
 ├── 弹窗素材/           ← 原始照片（源文件保留）
 │   └── *.jpg × 17
 └── 背景音乐.mp3        ← 原始音频（源文件保留）
+```
+
+---
+
+## 七、永久部署方案 — GitHub Pages
+
+### 7.1 隧道方案的三大痛点
+
+最初使用 `cloudflared tunnel` 临时隧道，存在三个致命问题：
+
+| 问题 | 根因 | 表现 |
+|------|------|------|
+| ① 终端关闭 → 链接失效 | 隧道进程运行在本地电脑，关闭终端即杀死进程 | 白屏，链接不可访问 |
+| ② 断网 → 白屏 | 本地电脑是服务器，断网即下线 | 时好时坏，体验不可靠 |
+| ③ 免费时效限制 | `trycloudflare.com` 隧道使用时间/带宽均有限制 | 链接不定时失效 |
+
+**核心矛盾**：H5 分享需要 7×24 在线的服务器，但隧道方案把个人电脑当服务器——电脑关机、断网、隧道过期任何一个都会让链接报废。
+
+### 7.2 解决思路
+
+```
+问题本质：把 HTML 从"自己电脑上临时托管" → "真正的云服务器上永久托管"
+约束条件：免费、无需信用卡、国内能访问、部署简单
+```
+
+**方案筛选**：
+
+| 平台 | 费用 | 国内速度 | 实名要求 | 评价 |
+|------|------|---------|---------|------|
+| Gitee Pages | 免费 | 🚀 快 | ⚠️ 需要 | ❌ 2024年5月已下线 |
+| GitHub Pages | 免费 | 可接受 | ❌ 不需要 | ✅ 首选 |
+| Cloudflare Pages | 免费 | 中等 | ❌ 不需要 | ✅ 备选 |
+| 腾讯 EdgeOne Pages | 免费额度 | 🚀 快 | ⚠️ 需要 | ⚠️ 需实名 |
+
+**最终选择**：GitHub Pages —— 免费、永久、无需实名认证、744KB 的页面在国内 2-3 秒可打开。
+
+### 7.3 部署工具链
+
+| 工具 | 用途 | 安装 |
+|------|------|------|
+| **Git** | 版本控制，推送代码 | 系统自带 |
+| **GitHub CLI** (`gh`) | 命令行管理 GitHub 仓库 | `winget install GitHub.cli` |
+| **GitHub Personal Access Token** | API 鉴权（需勾选 `repo` 权限） | GitHub → Settings → Developer settings |
+
+### 7.4 部署步骤
+
+**第 1 步：初始化本地 Git 仓库**
+
+```bash
+cd 小田的祝福/
+git init
+git config user.name "小田的祝福"
+git add index.html README.md
+git commit -m "初始版本"
+```
+
+**第 2 步：GitHub 认证**
+
+```bash
+# 安装 GitHub CLI
+winget install GitHub.cli
+
+# 创建 Token（需勾选 repo 权限）→ https://github.com/settings/tokens/new
+# 用 Token 登录
+gh auth login --with-token
+```
+
+**第 3 步：创建仓库并推送**
+
+```bash
+# 在 https://github.com/new 手动创建公开仓库（不勾任何初始化选项）
+
+# 添加远程并推送
+git remote add github https://github.com/fangyuelin/xiaotian-blessing.git
+git push -u github master
+```
+
+**第 4 步：开启 GitHub Pages（API 方式）**
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/fangyuelin/xiaotian-blessing/pages" \
+  -d '{"source":{"branch":"master","path":"/"}}'
+```
+
+也可以用 Web UI：仓库 → Settings → Pages → Source 选 `master` → Save。
+
+**第 5 步：验证上线**
+
+```bash
+curl -s -o /dev/null -w "HTTP: %{http_code}" \
+  "https://fangyuelin.github.io/xiaotian-blessing/"
+# → HTTP: 200
+```
+
+### 7.5 踩坑记录
+
+| 坑 | 原因 | 解决 |
+|----|------|------|
+| `gh auth login --web` 超时 | GitHub 国内访问慢，浏览器流程中断 | 改用 `--with-token` 方式登录 |
+| `gh api` 返回 401 | Token 创建时未勾选任何权限 | 重新生成 Token，勾选 `repo` 权限 |
+| `gh api /repos/...` 路径报错 | Git Bash 把 `/repos` 当作本地路径 | 去掉前导斜杠：`repos/...` |
+| Web UI 点 Save 后 API 仍 404 | Pages 设置可能未真正保存 | 用 API `POST` 方式一键开启，结果确定性高 |
+| 首次部署后 404 | GitHub Pages 第一次构建需要时间 | 等 30-60 秒后重试 |
+| Gitee Pages 入口找不到 | Gitee Pages 于 2024年5月正式下线 | 改用 GitHub Pages |
+
+### 7.6 日常更新流程
+
+修改 `index.html` 后：
+
+```bash
+git add index.html
+git commit -m "更新内容描述"
+git push github master
+# GitHub 自动重新部署，约 1 分钟后生效
+```
+
+### 7.7 效果对比
+
+```
+旧方案（cloudflared tunnel）:
+  电脑开机 → 启动 http.server → 启动隧道 → 分享链接
+  ⚠️ 关机/断网/隧道过期 → 链接失效
+
+新方案（GitHub Pages）:
+  推送代码 → GitHub 自动部署 → 分享链接
+  ✅ 7×24 在线，永久有效，与你电脑状态完全无关
 ```
