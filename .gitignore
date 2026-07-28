@@ -1,0 +1,7 @@
+# 源文件（已内嵌到 index.html，无需上传）
+弹窗素材/
+背景音乐.mp3
+
+# 系统文件
+.DS_Store
+Thumbs.db
