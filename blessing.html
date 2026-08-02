@@ -333,10 +333,8 @@
   })();
 
   // ===== 参数 =====
-  const MAX_VISIBLE = 55;       // 屏幕最大同时显示爱心数（爱心永久留存，设大一些慢慢铺满）
-  const SPAWN_IVAL = 900;      // ms，每颗爱心弹出间隔
-  const HEART_LIFE_MIN = 12000; // 最短存活 ms
-  const HEART_LIFE_MAX = 22000; // 最长存活 ms
+  const MAX_VISIBLE = 55;
+  const SPAWN_IVAL = 380;      // ms，全程快速弹出
 
   let spawnedCount = 0;
   let blessingIndex = 0;      // 当前祝福语索引
@@ -387,24 +385,13 @@
 
   let svgIdCounter = 0;
 
-  // ===== 长文本智能拆行 =====
-  function formatBlessingText(text) {
-    if (text.length <= 10) return { html: text, multiLine: false };
-    // 找自然断点：优先在标点处拆
-    const mid = Math.floor(text.length / 2);
-    let split = mid;
-    for (let i = mid - 2; i <= mid + 3; i++) {
-      if (i > 2 && i < text.length - 2 && '，。、！？,'.includes(text[i])) {
-        split = i + 1;
-        break;
-      }
+  // ===== 统一在"雪"字后分行 =====
+  function splitBlessing(text) {
+    const idx = text.indexOf('雪');
+    if (idx > 0) {
+      return escapeHTML(text.slice(0, idx + 1)) + '<br>' + escapeHTML(text.slice(idx + 1));
     }
-    // 没找到标点就均分
-    if (split === mid && text.length > 12) split = mid;
-    return {
-      html: text.slice(0, split) + '<br>' + text.slice(split),
-      multiLine: true
-    };
+    return escapeHTML(text);
   }
 
   // ===== 生成爱心 SVG =====
@@ -449,7 +436,7 @@
     return '#' + [dr,dg,db].map(v => v.toString(16).padStart(2,'0')).join('');
   }
 
-  // ===== 随机位置 =====
+  // ===== 散乱分布：避开已有爱心，均匀铺开 =====
   function randomPos(scale) {
     const vw = window.innerWidth, vh = window.innerHeight;
     const s = scale || 1;
@@ -457,12 +444,30 @@
     const cardH = 110 * s;
     const halfW = cardW / 2;
     const halfH = cardH / 2;
-    // 安全边距
-    const pad = 8;
+    const pad = 6;
     const minX = halfW + pad;
     const maxX = vw - halfW - pad;
     const minY = halfH + pad;
     const maxY = vh - halfH - pad;
+
+    const existing = document.querySelectorAll('.heart-popup');
+    const minDist = 90; // 爱心中心最小间距
+
+    for (let attempt = 0; attempt < 15; attempt++) {
+      const x = minX + Math.random() * Math.max(0, maxX - minX);
+      const y = minY + Math.random() * Math.max(0, maxY - minY);
+      let tooClose = false;
+      for (const el of existing) {
+        const ex = parseFloat(el.style.left);
+        const ey = parseFloat(el.style.top);
+        if (!isNaN(ex) && Math.hypot(x - ex, y - ey) < minDist) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) return { x, y };
+    }
+    // 太挤了，随便放
     return {
       x: minX + Math.random() * Math.max(0, maxX - minX),
       y: minY + Math.random() * Math.max(0, maxY - minY),
@@ -487,16 +492,15 @@
       blessingIndex = 0;
     }
 
-    const formatted = formatBlessingText(rawText);
+    const html = splitBlessing(rawText); // 在"雪"后分行，已正确转义
     const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
-    // 两行文本爱心稍微大一点，确保文字读得清
-    const baseScale = formatted.multiLine ? 1.05 : 0.95;
-    const scale = baseScale + Math.random() * 0.55;
+    // 都是两行，爱心统一大一些
+    const scale = 1.1 + Math.random() * 0.5;   // 1.1 ~ 1.6
     const rot = (Math.random() - 0.5) * 28;
     const pos = randomPos(scale);
 
-    const svgStr = createHeartSVG(color, scale, formatted.multiLine)
-      .replace('TEXT_PLACEHOLDER', escapeHTML(formatted.html));
+    const svgStr = createHeartSVG(color, scale, true)
+      .replace('TEXT_PLACEHOLDER', html);
 
     const card = document.createElement('div');
     card.className = 'heart-popup';
@@ -533,7 +537,7 @@
     spawnTimer = setTimeout(() => {
       spawnHeart();
       scheduleNext();
-    }, SPAWN_IVAL + Math.random() * 350); // 加一点随机，更自然
+    }, SPAWN_IVAL + Math.random() * 200);
   }
 
   // ===== 开始按钮 =====
@@ -543,20 +547,7 @@
     document.getElementById('counter').classList.add('show');
     running = true;
 
-    // 首颗爱心
     spawnHeart();
-    // 前10颗加速出现，快速建立氛围
-    let quickCount = 0;
-    function quickSpawn() {
-      if (quickCount >= 9 || !running) return;
-      quickCount++;
-      setTimeout(() => {
-        spawnHeart();
-        if (quickCount < 9) quickSpawn();
-      }, 220 + Math.random() * 280);
-    }
-    quickSpawn();
-
     scheduleNext();
   });
 
