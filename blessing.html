@@ -167,18 +167,18 @@
   .heart-text-wrap span {
     color:#fff;
     font-weight:600;
-    font-size:0.76rem;
+    font-size:0.78rem;
     letter-spacing:0.05em;
     line-height:1.35;
     text-shadow: 0 1px 3px rgba(0,0,0,0.3);
     word-break: keep-all;
     overflow-wrap: break-word;
   }
-
-  /* 小爱心：用纯CSS，不用foreignObject，兼容性更好 */
-  .heart-popup.small-heart .heart-text-wrap span {
-    font-size:0.68rem;
+  .heart-text-wrap.multi-line span {
+    font-size:0.66rem;
+    line-height:1.3;
   }
+
 </style>
 </head>
 <body>
@@ -333,7 +333,7 @@
   })();
 
   // ===== 参数 =====
-  const MAX_VISIBLE = 40;       // 屏幕最大同时显示爱心数
+  const MAX_VISIBLE = 55;       // 屏幕最大同时显示爱心数（爱心永久留存，设大一些慢慢铺满）
   const SPAWN_IVAL = 900;      // ms，每颗爱心弹出间隔
   const HEART_LIFE_MIN = 12000; // 最短存活 ms
   const HEART_LIFE_MAX = 22000; // 最长存活 ms
@@ -387,8 +387,28 @@
 
   let svgIdCounter = 0;
 
+  // ===== 长文本智能拆行 =====
+  function formatBlessingText(text) {
+    if (text.length <= 10) return { html: text, multiLine: false };
+    // 找自然断点：优先在标点处拆
+    const mid = Math.floor(text.length / 2);
+    let split = mid;
+    for (let i = mid - 2; i <= mid + 3; i++) {
+      if (i > 2 && i < text.length - 2 && '，。、！？,'.includes(text[i])) {
+        split = i + 1;
+        break;
+      }
+    }
+    // 没找到标点就均分
+    if (split === mid && text.length > 12) split = mid;
+    return {
+      html: text.slice(0, split) + '<br>' + text.slice(split),
+      multiLine: true
+    };
+  }
+
   // ===== 生成爱心 SVG =====
-  function createHeartSVG(color, scale) {
+  function createHeartSVG(color, scale, multiLine) {
     const s = scale || 1;
     const uid = svgIdCounter++;
     const dark = darkenColor(color);
@@ -411,8 +431,8 @@
           stroke="rgba(255,255,255,0.22)" stroke-width="0.8"
           filter="url(#g${uid})"
         />
-        <foreignObject x="8" y="24" width="84" height="52">
-          <div xmlns="http://www.w3.org/1999/xhtml" class="heart-text-wrap">
+        <foreignObject x="8" y="${multiLine ? '22' : '26'}" width="84" height="${multiLine ? '56' : '46'}">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="heart-text-wrap${multiLine ? ' multi-line' : ''}">
             <span>TEXT_PLACEHOLDER</span>
           </div>
         </foreignObject>
@@ -461,23 +481,25 @@
       setTimeout(() => { if (old.parentNode) old.remove(); }, 420);
     }
 
-    const text = BLESSINGS[blessingIndex % TOTAL];
+    const rawText = BLESSINGS[blessingIndex % TOTAL];
     blessingIndex++;
     if (blessingIndex >= TOTAL) {
-      // 循环
       blessingIndex = 0;
     }
 
+    const formatted = formatBlessingText(rawText);
     const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
-    const scale = 0.95 + Math.random() * 0.65; // 0.95 ~ 1.6
-    const rot = (Math.random() - 0.5) * 28;   // -14° ~ +14°
+    // 两行文本爱心稍微大一点，确保文字读得清
+    const baseScale = formatted.multiLine ? 1.05 : 0.95;
+    const scale = baseScale + Math.random() * 0.55;
+    const rot = (Math.random() - 0.5) * 28;
     const pos = randomPos(scale);
 
-    const svgStr = createHeartSVG(color, scale).replace('TEXT_PLACEHOLDER', escapeHTML(text));
+    const svgStr = createHeartSVG(color, scale, formatted.multiLine)
+      .replace('TEXT_PLACEHOLDER', escapeHTML(formatted.html));
 
     const card = document.createElement('div');
     card.className = 'heart-popup';
-    if (scale < 0.85) card.classList.add('small-heart');
     card.style.cssText = `
       left:${pos.x}px; top:${pos.y}px;
       --r:${rot.toFixed(1)}deg;
@@ -490,16 +512,7 @@
     // 更新计数
     updateCounter();
 
-    // 设定存活时间
-    const life = HEART_LIFE_MIN + Math.random() * (HEART_LIFE_MAX - HEART_LIFE_MIN);
-    const timer = setTimeout(() => {
-      card.classList.add('fading');
-      setTimeout(() => {
-        if (card.parentNode) card.remove();
-        updateCounter();
-      }, 420);
-    }, life);
-    card._lifeTimer = timer;
+    // 爱心永久留在屏幕上，只在新爱心超出上限时移除最旧的
   }
 
   function updateCounter() {
