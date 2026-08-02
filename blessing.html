@@ -333,8 +333,8 @@
   })();
 
   // ===== 参数 =====
-  const MAX_VISIBLE = 45;       // 屏幕最大同时显示爱心数
-  const SPAWN_IVAL = 1300;     // ms，每颗爱心弹出间隔
+  const MAX_VISIBLE = 40;       // 屏幕最大同时显示爱心数
+  const SPAWN_IVAL = 900;      // ms，每颗爱心弹出间隔
   const HEART_LIFE_MIN = 12000; // 最短存活 ms
   const HEART_LIFE_MAX = 22000; // 最长存活 ms
 
@@ -411,7 +411,7 @@
           stroke="rgba(255,255,255,0.22)" stroke-width="0.8"
           filter="url(#g${uid})"
         />
-        <foreignObject x="12" y="28" width="76" height="45">
+        <foreignObject x="8" y="24" width="84" height="52">
           <div xmlns="http://www.w3.org/1999/xhtml" class="heart-text-wrap">
             <span>TEXT_PLACEHOLDER</span>
           </div>
@@ -469,7 +469,7 @@
     }
 
     const color = HEART_COLORS[Math.floor(Math.random() * HEART_COLORS.length)];
-    const scale = 0.7 + Math.random() * 0.75; // 0.7 ~ 1.45
+    const scale = 0.95 + Math.random() * 0.65; // 0.95 ~ 1.6
     const rot = (Math.random() - 0.5) * 28;   // -14° ~ +14°
     const pos = randomPos(scale);
 
@@ -520,7 +520,7 @@
     spawnTimer = setTimeout(() => {
       spawnHeart();
       scheduleNext();
-    }, SPAWN_IVAL + Math.random() * 600); // 加一点随机，更自然
+    }, SPAWN_IVAL + Math.random() * 350); // 加一点随机，更自然
   }
 
   // ===== 开始按钮 =====
@@ -540,7 +540,7 @@
       setTimeout(() => {
         spawnHeart();
         if (quickCount < 9) quickSpawn();
-      }, 280 + Math.random() * 350);
+      }, 220 + Math.random() * 280);
     }
     quickSpawn();
 
